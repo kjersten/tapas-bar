@@ -4,3 +4,7 @@ episodes/
 public/media/
 tmp/
 feed.xml
+.sass-cache/
+logs/
+pids/
+unicorn.rb
