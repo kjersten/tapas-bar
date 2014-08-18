@@ -149,6 +149,7 @@ $(document).on('submit', 'form[action^="/download"]', function(){
 <link rel="stylesheet" href="tapas.css">
 <meta content='initial-scale=1.0' name='viewport'>
 <script src=zepto.min.js></script>
+<META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
 <%= yield %>
 
 @@ style
