@@ -9,7 +9,7 @@ Episode = Struct.new(:num, :dir) do
         ep_num = $1.to_i
         self.new ep_num, File.join(where, dir)
       end
-    end.compact.reverse
+    end.compact.sort { |x,y| x.num <=> y.num }.reverse
   end
 
   def self.unwatched
