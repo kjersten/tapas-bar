@@ -1,0 +1,63 @@
+<nav class="navbar navbar-default" role="navigation">
+  <div class="navbar-header">
+    <div class="navbar-brand">Ruby Tapas</a>
+  </div>
+  <ul class="nav navbar-nav">
+    <li <%= all_eps? ? 'class="active"' : '' %>><a href="/all">All</a></li>
+    <li <%= all_eps? ? '' : 'class="active"' %>><a href="/unwatched">Unwatched</a></li>
+  </ul>
+</nav>
+
+<div class="container">
+  <% episodes.each do |ep| %>
+    <div <%= ep.watched?? 'class=watched' : '' %>>
+      <%= ep.html_body %>
+      <div class="row">
+        <% if ep.has_video? %>
+          <form action="<%= mark_as_watched_path ep %>" method=post>
+            <% unless ep.watched? %>
+            <div class="col-md-2 col-sm-4">
+              <button type="submit" class="btn btn-default">
+                Mark watched
+              </button>
+            </div>
+            <% end %>
+            <div class="col-md-2 col-sm-4">
+            <button type="submit" class="btn btn-success" name="redirect_to" value="<%= ep.local_video_url %>">
+              Watch episode
+            </button>
+            </div>
+          </form>
+        <% else %>
+          <div class="col-md-2 col-sm-4">
+            <form action="<%= download_path ep %>" method=post>
+              <button type="submit" class="btn btn-primary">Download</button>
+            </form>
+          </div>
+        <% end %>
+      </div>
+    </div>
+  <% end %>
+</div>
+
+
+<script>
+function monitorProgress(form, url, percent) {
+  var num = parseInt(percent * 100)
+  $(form).find('button').first().text("Downloading: " + num + "%")
+  if (num < 100) setTimeout(function(){
+    $.get(url, function(newPercent){
+      monitorProgress(form, url, parseFloat(newPercent))
+    })
+  }, 2000)
+}
+
+$(document).on('submit', 'form[action^="/download"]', function(){
+  var form = $(this)
+  form.find('button').attr('disabled', true)
+  $.post(form.attr('action'), function(progressUrl){
+    monitorProgress(form, progressUrl, 0)
+  })
+  return false
+})
+</script>

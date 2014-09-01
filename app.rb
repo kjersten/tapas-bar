@@ -1,6 +1,10 @@
 require 'sinatra'
 require 'fileutils'
 require 'tempfile'
+require "sinatra/reloader" if development?
+
+enable :sessions
+set :session_secret, ENV['RT_SESSION_SECRET']
 
 Episode = Struct.new(:num, :dir) do
   def self.all where = 'episodes'
@@ -21,7 +25,8 @@ Episode = Struct.new(:num, :dir) do
   end
 
   def html_body
-    File.read File.join(dir, 'index.html')
+    html = File.read File.join(dir, 'index.html')
+    html.gsub(/<h3>.*<\/ul>/m, '')
   end
 
   def video_url
@@ -53,9 +58,35 @@ helpers do
   def download_path episode
     "/download/%d" % episode.num
   end
+
+  def all_eps?
+    request.path_info == "/all"
+  end
+end
+
+before do
+  pass if ['/', '/login', '/tapas.css'].include?(request.path_info)
+
+  unless session[:username] == ENV['RT_USER']
+    redirect '/'
+  end
 end
 
 get '/' do
+  erb :login, locals: { login_failed: false }
+end
+
+post '/login' do
+  username, password = params[:username], params[:password]
+  if username == ENV['RT_USER'] && password == ENV['RT_PASS']
+    session[:username] = username
+    redirect "/unwatched"
+  else
+    erb :login, locals: { login_failed: true }
+  end
+end
+
+get '/unwatched' do
   erb :index, locals: { episodes: Episode.unwatched }
 end
 
@@ -94,80 +125,5 @@ get '/download/progress' do
 end
 
 get '/tapas.css' do
-  sass :style
+  scss :style
 end
-
-__END__
-@@ index
-<h1>RubyTapas</h1>
-<a href="/all">All</a>
-<a href="/">Unwatched</a>
-<ol>
-  <% for ep in episodes %>
-  <li<%= ep.watched?? ' class=watched' : '' %>>
-  <%= ep.html_body %>
-  <form action="<%= mark_as_watched_path ep %>" method=post>
-    <% if ep.has_video? %>
-    <button type=submit name=redirect_to value="<%= ep.local_video_url %>">Watch episode</button>
-    <% end %>
-    <% unless ep.watched? %>
-    <button type=submit>Mark watched</button>
-    <% end %>
-  </form>
-  <% unless ep.has_video? %>
-  <form action="<%= download_path ep %>" method=post>
-    <button type=submit>Download</button>
-  </form>
-  <% end %>
-  </li>
-  <% end %>
-</ol>
-
-<script>
-function monitorProgress(form, url, percent) {
-  var num = parseInt(percent * 100)
-  $(form).find('button').first().text("Downloading: " + num + "%")
-  if (num < 100) setTimeout(function(){
-    $.get(url, function(newPercent){
-      monitorProgress(form, url, parseFloat(newPercent))
-    })
-  }, 2000)
-}
-
-$(document).on('submit', 'form[action^="/download"]', function(){
-  var form = $(this)
-  form.find('button').attr('disabled', true)
-  $.post(form.attr('action'), function(progressUrl){
-    monitorProgress(form, progressUrl, 0)
-  })
-  return false
-})
-</script>
-
-@@ layout
-<!doctype html>
-<link rel="stylesheet" href="tapas.css">
-<meta content='initial-scale=1.0' name='viewport'>
-<script src=zepto.min.js></script>
-<META NAME="ROBOTS" CONTENT="NOINDEX, NOFOLLOW">
-<%= yield %>
-
-@@ style
-body
-  font: medium helvetica, sans-serif
-  padding: 2em 4em
-ol
-  list-style: none
-ol > li
-  margin-bottom: 2em
-  &.watched
-    color: gray
-    a
-      color: inherit
-ol h1
-  font-size: 1.2em
-ol h3
-  font-size: 1em
-
-form
-  margin-top: 1em
