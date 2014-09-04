@@ -24,9 +24,28 @@ Episode = Struct.new(:num, :dir) do
     all.find { |ep| ep.num == num.to_i }
   end
 
+  def html
+    File.read File.join(dir, 'index.html')
+  end
+
   def html_body
-    html = File.read File.join(dir, 'index.html')
     html.gsub(/<h3>.*<\/ul>/m, '')
+  end
+
+  def full_title
+    html.match(/<h1>(.*)<\/h1>/)[1]
+  end
+
+  def number
+    full_title.match(/(.*?):/)[1]
+  end
+
+  def title
+    full_title.match(/(:\s*)(.*)/)[2]
+  end
+
+  def description
+    html.match(/<p>(.*)<\/p>/)[1]
   end
 
   def video_url
