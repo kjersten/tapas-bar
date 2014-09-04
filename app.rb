@@ -84,7 +84,7 @@ helpers do
 end
 
 before do
-  pass if ['/', '/login', '/tapas.css'].include?(request.path_info)
+  pass if ['/', '/login', '/tapas.css', '/download/progress'].include?(request.path_info)
 
   unless session[:username] == ENV['RT_USER']
     redirect '/'
