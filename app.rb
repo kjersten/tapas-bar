@@ -3,8 +3,10 @@ require 'fileutils'
 require 'tempfile'
 require "sinatra/reloader" if development?
 
+
 enable :sessions
 set :session_secret, ENV['RT_SESSION_SECRET']
+set :protection, except: :session_hijacking
 
 Episode = Struct.new(:num, :dir) do
   def self.all where = 'episodes'
@@ -84,7 +86,7 @@ helpers do
 end
 
 before do
-  pass if ['/', '/login', '/tapas.css', '/download/progress'].include?(request.path_info)
+  pass if ['/', '/login', '/tapas.css'].include?(request.path_info)
 
   unless session[:username] == ENV['RT_USER']
     redirect '/'
