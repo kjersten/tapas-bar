@@ -2,7 +2,7 @@ require 'sinatra'
 require 'fileutils'
 require 'tempfile'
 require "sinatra/reloader" if development?
-
+require "sinatra/json"
 
 enable :sessions
 set :session_secret, ENV['RT_SESSION_SECRET']
@@ -79,6 +79,17 @@ helpers do
   def all_eps?
     request.path_info == "/all"
   end
+
+  def get_hash(episodes)
+    episodes.map do |ep|
+      {
+        number: ep.number,
+        title: ep.title,
+        description: ep.description,
+        actions: erb(:actions, locals: { ep: ep })
+      }
+    end
+  end
 end
 
 before do
@@ -109,6 +120,11 @@ end
 
 get '/all' do
   erb :index, locals: { episodes: Episode.all }
+end
+
+get '/list' do
+  episodes = params[:all] ? Episode.all : Episode.unwatched
+  json data: get_hash(episodes)
 end
 
 post '/watched/:ep_num' do
