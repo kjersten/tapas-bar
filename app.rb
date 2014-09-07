@@ -11,7 +11,7 @@ set :protection, except: :session_hijacking
 Episode = Struct.new(:num, :dir) do
   def self.all where = 'episodes'
     Dir.entries(where).map do |dir|
-      if dir =~ /^(\d+)/
+      if dir =~ /\A(\d+)/
         ep_num = $1.to_i
         self.new ep_num, File.join(where, dir)
       end
@@ -27,11 +27,7 @@ Episode = Struct.new(:num, :dir) do
   end
 
   def html
-    File.read File.join(dir, 'index.html')
-  end
-
-  def html_body
-    html.gsub(/<h3>.*<\/ul>/m, '')
+    @html ||= File.read File.join(dir, 'index.html')
   end
 
   def full_title
