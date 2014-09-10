@@ -101,6 +101,10 @@ before do
 end
 
 get '/' do
+  if session[:username] == ENV['RT_USER']
+    redirect '/unwatched'
+  end
+
   erb :login, locals: { login_failed: false }
 end
 
