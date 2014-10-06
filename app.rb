@@ -10,16 +10,11 @@ enable :sessions
 set :session_secret, ENV['RT_SESSION_SECRET']
 set :protection, except: :session_hijacking
 
-# Episode = Struct.new(:number, :title, :description, :local_video_url, :has_video?, :watched?) do
 class Episode < Hashie::Mash
   def self.all where = 'episodes'
     client = Elasticsearch::Client.new log: true
     elasticsearch_records = client.search index: 'tapas', size: 400
     elasticsearch_records["hits"]["hits"].map { |hit| self.new(hit["_source"]) }
-    # elasticsearch_records["hits"]["hits"].map do |hit|
-    #   ep = hit["_source"]
-    #   self.new(ep['number'], ep['title'], ep['description'], ep['local_video_url'], ep['has_video?'], ep['watched?'])
-    # end
   end
 
   def self.unwatched
