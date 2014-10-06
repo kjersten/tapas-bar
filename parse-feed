@@ -2,6 +2,7 @@
 require 'bundler/setup'
 require 'nokogiri'
 require 'fileutils'
+require 'elasticsearch'
 
 feed = Nokogiri::XML ARGF
 
@@ -31,6 +32,10 @@ Episode = Struct.new(:num, :title, :html_body, :video) do
   def video_url
     video.url
   end
+
+  def description
+    html_body.match(/<p>(.*)<\/p>/)[1]
+  end
 end
 
 tapas = []
@@ -47,9 +52,19 @@ feed.xpath('/rss/channel/item').each do |item|
   end
 end
 
+client = Elasticsearch::Client.new log: true
+
 tapas.each do |ep|
   ep_dir = 'episodes/%04d-%s' % [ep.num, ep.sanitized_title]
   media_dest = 'public/media/%s' % ep.video_name
+  client.index  index: 'tapas', type: 'episode', id: ep.num, body: {
+      number: ep.num,
+      title: ep.title,
+      description: ep.description,
+      local_video_url: media_dest,
+      has_video?: File.exists?(media_dest),
+      watched?: File.exists?(File.join(ep_dir, 'watched'))
+    }
   next if File.directory? ep_dir
 
   FileUtils.mkdir_p ep_dir
@@ -67,4 +82,13 @@ tapas.each do |ep|
     FileUtils.mkdir_p 'public/media'
     system './fetch', ep.video_url, media_dest
   end
+
+  client.index  index: 'tapas', type: 'episode', id: ep.num, body: {
+      number: ep.num,
+      title: ep.title,
+      description: ep.description,
+      local_video_url: media_dest,
+      has_video?: File.exists?(media_dest),
+      watched?: File.exists?(File.join(ep_dir, 'watched'))
+    }
 end

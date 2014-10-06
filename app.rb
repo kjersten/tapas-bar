@@ -1,79 +1,49 @@
 require 'sinatra'
 require 'fileutils'
 require 'tempfile'
-require "sinatra/reloader" if development?
 require "sinatra/json"
+require "elasticsearch"
+require "hashie"
+require "sinatra/reloader" if development?
 
 enable :sessions
 set :session_secret, ENV['RT_SESSION_SECRET']
 set :protection, except: :session_hijacking
 
-Episode = Struct.new(:num, :dir) do
+# Episode = Struct.new(:number, :title, :description, :local_video_url, :has_video?, :watched?) do
+class Episode < Hashie::Mash
   def self.all where = 'episodes'
-    Dir.entries(where).map do |dir|
-      if dir =~ /\A(\d+)/
-        ep_num = $1.to_i
-        self.new ep_num, File.join(where, dir)
-      end
-    end.compact.sort { |x,y| x.num <=> y.num }.reverse
+    client = Elasticsearch::Client.new log: true
+    elasticsearch_records = client.search index: 'tapas', size: 400
+    elasticsearch_records["hits"]["hits"].map { |hit| self.new(hit["_source"]) }
+    # elasticsearch_records["hits"]["hits"].map do |hit|
+    #   ep = hit["_source"]
+    #   self.new(ep['number'], ep['title'], ep['description'], ep['local_video_url'], ep['has_video?'], ep['watched?'])
+    # end
   end
 
   def self.unwatched
-    all.reject(&:watched?)
+    client = Elasticsearch::Client.new log: true
+    elasticsearch_records = client.search index: 'tapas', size: 400, body: { query: { match: { watched?: false } } }
+    elasticsearch_records["hits"]["hits"].map { |hit| self.new(hit["_source"]) }
   end
 
   def self.find_by_number num
     all.find { |ep| ep.num == num.to_i }
   end
 
-  def html
-    @html ||= File.read File.join(dir, 'index.html')
-  end
-
-  def full_title
-    html.match(/<h1>(.*)<\/h1>/)[1]
-  end
-
-  def number
-    full_title.match(/(.*?):/)[1]
-  end
-
-  def title
-    full_title.match(/(:\s*)(.*)/)[2]
-  end
-
-  def description
-    html.match(/<p>(.*)<\/p>/)[1]
-  end
-
-  def video_url
-    @url ||= File.read File.join(dir, 'video-url')
-  end
-
-  def local_video_url
-    "media/#{File.basename video_url}"
-  end
-
-  def has_video?
-    File.exist? "public/#{local_video_url}"
-  end
-
-  def watched_indicator
-    File.join(dir, 'watched')
-  end
-
-  def watched?
-    File.exist? watched_indicator
+  def public_video_url
+    "media/#{File.basename local_video_url}"
   end
 end
 
 helpers do
   def mark_as_watched_path episode
-    "/watched/%d" % episode.num
+    "/watched/%d" % episode.number
   end
 
   def download_path episode
-    "/download/%d" % episode.num
+    "/download/%d" % episode.number
   end
 
   def all_eps?
