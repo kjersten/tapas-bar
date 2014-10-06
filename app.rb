@@ -24,11 +24,17 @@ class Episode < Hashie::Mash
   end
 
   def self.find_by_number num
-    all.find { |ep| ep.num == num.to_i }
+    client = Elasticsearch::Client.new log: true
+    elasticsearch_records = client.search index: 'tapas', size: 400, body: { query: { match: { number: num } } }
+    self.new(elasticsearch_records["hits"]["hits"][0]["_source"])
   end
 
   def public_video_url
     "media/#{File.basename local_video_url}"
+  end
+
+  def has_video?
+    File.exists?(local_video_url)
   end
 end
 
@@ -98,14 +104,15 @@ end
 
 post '/watched/:ep_num' do
   ep = Episode.find_by_number params[:ep_num]
-  FileUtils.touch ep.watched_indicator
+  client = Elasticsearch::Client.new log: true
+  client.update index: 'tapas', type: 'episode', id: ep.number, body: { doc: { watched?: true } }
   redirect params[:redirect_to] || back
 end
 
 post '/download/:ep_num' do
   ep = Episode.find_by_number params[:ep_num]
-  tracefile = Tempfile.new("#{ep.num}.trace")
-  system %(./fetch "#{ep.video_url}" "public/#{ep.local_video_url}" --trace-ascii "#{tracefile.path}" &)
+  tracefile = Tempfile.new("#{ep.number}.trace")
+  system %(./fetch "#{ep.remote_video_url}" "#{ep.local_video_url}" --trace-ascii "#{tracefile.path}" &)
   "/download/progress?tracefile=#{tracefile.path}"
 end
 

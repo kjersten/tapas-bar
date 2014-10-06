@@ -57,6 +57,14 @@ client = Elasticsearch::Client.new log: true
 tapas.each do |ep|
   ep_dir = 'episodes/%04d-%s' % [ep.num, ep.sanitized_title]
   media_dest = 'public/media/%s' % ep.video_name
+  client.index  index: 'tapas', type: 'episode', id: ep.num, body: {
+      number: ep.num,
+      title: ep.title,
+      description: ep.description,
+      local_video_url: media_dest,
+      remote_video_url: File.read(File.join(ep_dir, 'video-url')),
+      watched?: File.exists?(File.join(ep_dir, 'watched'))
+    }
   next if File.directory? ep_dir
 
   FileUtils.mkdir_p ep_dir
@@ -80,7 +88,7 @@ tapas.each do |ep|
       title: ep.title,
       description: ep.description,
       local_video_url: media_dest,
-      has_video?: File.exists?(media_dest),
+      remote_video_url: File.read(File.join(ep_dir, 'video-url')),
       watched?: false
     }
 end
