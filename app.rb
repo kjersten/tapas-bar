@@ -3,30 +3,23 @@ require 'fileutils'
 require 'tempfile'
 require "sinatra/json"
 require "elasticsearch"
-require "hashie"
 require "sinatra/reloader" if development?
 
 enable :sessions
 set :session_secret, ENV['RT_SESSION_SECRET']
 set :protection, except: :session_hijacking
 
-class Episode < Hashie::Mash
-  def self.all where = 'episodes'
-    client = Elasticsearch::Client.new log: true
-    elasticsearch_records = client.search index: 'tapas', size: 400
-    elasticsearch_records["hits"]["hits"].map { |hit| self.new(hit["_source"]) }
+Episode = Struct.new(:number, :title, :description, :remote_video_url, :local_video_url, :has_video?, :watched?) do
+  def self.all
+    parse(records_from_elasticsearch)
   end
 
   def self.unwatched
-    client = Elasticsearch::Client.new log: true
-    elasticsearch_records = client.search index: 'tapas', size: 400, body: { query: { match: { watched?: false } } }
-    elasticsearch_records["hits"]["hits"].map { |hit| self.new(hit["_source"]) }
+    parse(records_from_elasticsearch({ watched?: false }))
   end
 
-  def self.find_by_number num
-    client = Elasticsearch::Client.new log: true
-    elasticsearch_records = client.search index: 'tapas', size: 400, body: { query: { match: { number: num } } }
-    self.new(elasticsearch_records["hits"]["hits"][0]["_source"])
+  def self.find_by_number(num)
+    parse(records_from_elasticsearch({ number: num })).first
   end
 
   def public_video_url
@@ -35,6 +28,31 @@ class Episode < Hashie::Mash
 
   def has_video?
     File.exists?(local_video_url)
+  end
+
+  private
+
+  def self.elasticsearch_client
+    Elasticsearch::Client.new log: true
+  end
+
+  def self.records_from_elasticsearch(options = {})
+    elasticsearch_client.search index: 'tapas', size: 400, body: formulate_query_string(options)
+  end
+
+  def self.formulate_query_string(options)
+    if options.empty?
+      {}
+    else
+      { query: { match: options } }
+    end
+  end
+
+  def self.parse(elasticsearch_records)
+    elasticsearch_records["hits"]["hits"].map do |hit|
+      ep = hit["_source"]
+      self.new(ep['number'], ep['title'], ep['description'], ep['remote_video_url'], ep['local_video_url'], ep['has_video?'], ep['watched?'])
+    end
   end
 end
 
@@ -60,6 +78,13 @@ helpers do
         actions: erb(:actions, locals: { ep: ep })
       }
     end
+  end
+
+  def time_it(operation_name, &block)
+    start_time = Time.now
+    yield
+    end_time = Time.now
+    puts "#{operation_name} operation took #{end_time - start_time} seconds"
   end
 end
 
@@ -90,11 +115,13 @@ post '/login' do
 end
 
 get '/unwatched' do
-  erb :index, locals: { episodes: Episode.unwatched }
+  episodes = time_it"query and parse unwatched records" do Episode.unwatched end
+  erb :index, locals: { episodes: episodes }
 end
 
 get '/all' do
-  erb :index, locals: { episodes: Episode.all }
+  episodes = time_it "query and parse all records" do Episode.all end
+  erb :index, locals: { episodes: episodes }
 end
 
 get '/list' do
