@@ -34,9 +34,9 @@ helpers do
     end
   end
 
-  def time_it(operation_name, &block)
+  def time_it(operation_name, operation)
     start_time = Time.now
-    yield
+    operation.call
     end_time = Time.now
     puts "#{operation_name} operation took #{end_time - start_time} seconds"
   end
@@ -69,16 +69,12 @@ post '/login' do
 end
 
 get '/unwatched' do
-  episodes = time_it "query and parse unwatched records" do
-    Episode.unwatched
-  end
+  episodes = time_it "query and parse unwatched records", -> { Episode.unwatched }
   erb :index, locals: { episodes: episodes }
 end
 
 get '/all' do
-  episodes = time_it "query and parse all records" do
-    Episode.all
-  end
+  episodes = time_it "query and parse all records", -> { Episode.all }
   erb :index, locals: { episodes: episodes }
 end
 
