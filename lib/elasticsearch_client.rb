@@ -1,6 +1,6 @@
 module ElasticsearchClient
   def client
-    Elasticsearch::Client.new log: true
+    Elasticsearch::Client.new log: true, host: ENV['ELASTICSEARCH_HOST']
   end
 
   def records_from_elasticsearch(options = {})
