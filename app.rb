@@ -69,13 +69,11 @@ post '/login' do
 end
 
 get '/unwatched' do
-  episodes = time_it "query and parse unwatched records", -> { Episode.unwatched }
-  erb :index, locals: { episodes: episodes }
+  erb :index
 end
 
 get '/all' do
-  episodes = time_it "query and parse all records", -> { Episode.all }
-  erb :index, locals: { episodes: episodes }
+  erb :index
 end
 
 get '/list' do
